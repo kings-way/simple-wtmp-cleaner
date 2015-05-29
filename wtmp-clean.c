@@ -52,7 +52,7 @@ int main( int argc, char **argv)
 {
 		if(argc<2)
 		{
-				printf("Usage:\twtmp-clean [utmp_file] :        to delete specific entry\n");
+				printf("Usage:\twtmp-clean [utmp_file] :        to delete specific entry in interactive mode\n");
 				printf("      \twtmp-clean clear [utmp_file] :  to clear the data in the file\n");
 				printf("\nExample:wtmp-clean /var/log/wtmp\n");
 				printf("\twtmp-clean /run/utmp\n");
