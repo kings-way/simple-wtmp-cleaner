@@ -1,3 +1,25 @@
+/*
+ * wtmp-clean
+ *
+ * a simple program to erase specific entries in utmp files like /var/log/wtmp, etc.
+ *
+ * Copyright (C) 2015 King's Way <root@kings-way.info>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ */
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -16,7 +38,8 @@ char 	*ut_write_list	( char *filename, struct ut_node *head );
 void 	ut_print_list	( struct ut_node *head );
 void 	ut_print_node	( int id, struct utmp _utmp );
 char 	*ut_delete_node	( int id, struct ut_node *head );
-char 	*gettime		( time_t time );
+void	clear_file		( char *filename);
+char 	*get_time		( time_t time );
 
 struct ut_node
 {
@@ -29,15 +52,25 @@ int main( int argc, char **argv)
 {
 		if(argc<2)
 		{
-				printf("Usage:\twtmp-clean [utmp_file]\n");
-				printf("Ex:\twtmp-clean /var/log/wtmp\n");
+				printf("Usage:\twtmp-clean [utmp_file] :        to delete specific entry\n");
+				printf("      \twtmp-clean clear [utmp_file] :  to clear the data in the file\n");
+				printf("\nExample:wtmp-clean /var/log/wtmp\n");
 				printf("\twtmp-clean /run/utmp\n");
+				printf("\twtmp-clean clear /var/log/btmp\n");
 				exit(-1);
 		}
+		
+
+		else if(argc==3&&strcmp(argv[1],"clear")==0)
+		{
+				clear_file(argv[2]);
+				return 0;
+		}
+		
 		char *filename=argv[1];
 		struct ut_node *head=ut_read_list(filename);
 		
-		int input=-99;
+		int input=-2;
 		char *result=NULL;
 		do
 		{
@@ -48,7 +81,6 @@ int main( int argc, char **argv)
 				switch(input)
 				{
 						case -1:result=ut_write_list(filename,head);break;
-						case -2:system("echo > /var/log/btmp");break;
 						default:
 								if(input>=0)
 										result=ut_delete_node(input,head);
@@ -57,7 +89,7 @@ int main( int argc, char **argv)
 				ut_print_list(head);
 				printf("%s",result==NULL?"":result);
 				printf("\nInput the number of the entry to delete: \n");
-				printf(" ('-1' to save ; '-2' to clear btmp  'q' to exit )\n");
+				printf(" ('-1' to save ;  'q' to exit )\n");
 
 		}while(scanf("%d",&input)>0);
 
@@ -119,41 +151,42 @@ void ut_print_list(struct ut_node *head)
 
 void ut_print_node(int id, struct utmp _utmp)
 {
-    const char *addr_str, *time_str;
-    char buffer[INET6_ADDRSTRLEN];
+    	const char *str_addr, *str_time;
+    	char tmp[INET6_ADDRSTRLEN];
 
-    if (_utmp.ut_addr_v6[1] || _utmp.ut_addr_v6[2] || _utmp.ut_addr_v6[3])
-			addr_str= inet_ntop(AF_INET6, &(_utmp.ut_addr_v6), buffer, sizeof(buffer));
-    else
-        	addr_str= inet_ntop(AF_INET, &(_utmp.ut_addr_v6), buffer, sizeof(buffer));
+    	if (_utmp.ut_addr_v6[1] || _utmp.ut_addr_v6[2] || _utmp.ut_addr_v6[3])
+				str_addr= inet_ntop(AF_INET6, &_utmp.ut_addr_v6, tmp, sizeof(tmp));
+    	else
+        		str_addr= inet_ntop(AF_INET, &_utmp.ut_addr_v6, tmp, sizeof(tmp));
 
-    time_str= gettime(_utmp.ut_tv.tv_sec);
-	char *type=NULL;
-	switch(_utmp.ut_type)
-	{
-		case 1: type="run_lvl";	break;
-		case 2:	type="reboot";	break;
-		case 6:	type="tty_init";break;
-		case 7:	type="LogIN";	break;
-		case 8:	type="LogOUT";	break;
-	}
-    printf("# %-4d  %8s   %05d  %-*.*s %-*.*s %-*.*s %-15s %-28.28s\n",
-          id,type, _utmp.ut_pid, 8, UT_NAMESIZE, _utmp.ut_user,12,
-		  UT_LINESIZE,_utmp.ut_line, 20, UT_HOSTSIZE, _utmp.ut_host,addr_str, time_str);
+    	str_time= get_time(_utmp.ut_tv.tv_sec);
+
+		char *type=NULL;
+		switch(_utmp.ut_type)
+		{
+				case 1: type="run_lvl";	break;
+				case 2:	type="reboot";	break;
+				case 6:	type="tty_init";break;
+				case 7:	type="LogIN";	break;
+				case 8:	type="LogOUT";	break;
+		}
+    	printf("# %-4d  %8s   %05d  %-*.*s %-*.*s %-*.*s %-15s %-28.28s\n",
+          		id,type, _utmp.ut_pid, 8, UT_NAMESIZE, _utmp.ut_user,12,
+		  		UT_LINESIZE,_utmp.ut_line, 20, UT_HOSTSIZE, _utmp.ut_host,str_addr, str_time);
 }
 
-char *gettime(time_t time)
+char *get_time(time_t time)
 {
-    char s[29];  /* [Sun Sep 01 00:00:00 1998 PST] */
-    char *str=s;
-    struct tm *tmp;
+		static char *str=NULL;
+		str=malloc(sizeof(char)*29);
+    	struct tm *_tm;
 
-    if (time != 0 && (tmp = localtime(&time)))
-        strftime(s, 29, "%a %b %d %T %Y %Z", tmp);
-    else
-        s[0] = '\0';
+    	if (time != 0 && (_tm = localtime(&time)))
+        		strftime(str, 29, "%a %b %d %T %Y %Z", _tm);
+    	else
+        		str[0] = '\0';
 
-    return str;
+    	return str;
 }
 
 char *ut_delete_node(int id, struct ut_node *head)
@@ -179,5 +212,13 @@ char *ut_delete_node(int id, struct ut_node *head)
 		}
 		
 		return "\n\t\t\tSorry! Entry Not Exist\n\n";
+}
+void clear_file(char *filename)
+{
+		char *cmd=malloc(sizeof(char)*200);
+		sprintf(cmd,"getfacl %s > /tmp/aCl && rm -rf %s&&touch %s&&cd /&&setfacl --restore=/tmp/aCl",filename,filename,filename);
+		system(cmd);
+		system("rm -rf /tmp/aCl");
+		// if I run 'echo > /var/log/btmp', then the new data in the future will be a mess...
 }
 
