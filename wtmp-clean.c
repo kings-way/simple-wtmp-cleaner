@@ -3,7 +3,7 @@
  *
  * a simple program to erase specific entries in utmp files like /var/log/wtmp, etc.
  *
- * Copyright (C) 2015 King's Way <root@kings-way.info>
+ * Copyright (C) 2015 King's Way <io[AT]stdio.io>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
